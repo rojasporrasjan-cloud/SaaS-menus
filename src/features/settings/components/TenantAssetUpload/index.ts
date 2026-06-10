@@ -1,0 +1,1 @@
+export { TenantAssetUpload } from './TenantAssetUpload'

@@ -1,0 +1,1 @@
+export { TableQRCard } from './TableQRCard'

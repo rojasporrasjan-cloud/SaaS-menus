@@ -1,0 +1,1 @@
+export { DishImageUpload } from './DishImageUpload'

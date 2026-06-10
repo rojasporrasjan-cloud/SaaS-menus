@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  /* ─── Brand Colors — Amber / Restaurant Gold ─────────────────────────────── */
+  --color-brand-50:  #fef9ec;
+  --color-brand-100: #fdf0c8;
+  --color-brand-200: #fadf8c;
+  --color-brand-300: #f7c94a;
+  --color-brand-400: #f5b520;
+  --color-brand-500: #e99a0e;
+  --color-brand-600: #cc7809;
+  --color-brand-700: #a8560b;
+  --color-brand-800: #894210;
+  --color-brand-900: #713710;
+  --color-brand-950: #411b04;
+
+  /* ─── Neutral / Surface — Warm whites ────────────────────────────────────── */
+  --color-surface-0:   #ffffff;
+  --color-surface-50:  #faf9f7;   /* warm off-white — main content bg */
+  --color-surface-75:  #f5f3f0;   /* slightly warmer */
+  --color-surface-100: #efede9;   /* card borders */
+  --color-surface-150: #e8e5e0;   /* dividers */
+  --color-surface-200: #dbd8d2;   /* stronger borders */
+  --color-surface-300: #bfbbb4;   /* placeholder text */
+  --color-surface-350: #a8a49d;   /* secondary icons */
+  --color-surface-400: #908c85;   /* muted text */
+  --color-surface-500: #73706a;   /* body secondary */
+  --color-surface-600: #575450;   /* body */
+  --color-surface-700: #3d3b38;   /* strong body */
+  --color-surface-800: #27251f;   /* headings */
+  --color-surface-900: #17150f;   /* near black */
+
+  /* ─── Sidebar / Dark canvas ──────────────────────────────────────────────── */
+  --color-canvas-bg:     #111110;   /* sidebar background */
+  --color-canvas-border: #ffffff0f; /* subtle white border */
+  --color-canvas-item:   #ffffff06; /* hover item bg */
+  --color-canvas-active: #ffffff0d; /* active item bg */
+
+  /* ─── Typography ─────────────────────────────────────────────────────────── */
+  --font-sans:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ─── Radius ─────────────────────────────────────────────────────────────── */
+  --radius-sm:  0.375rem;
+  --radius-md:  0.5rem;
+  --radius-lg:  0.75rem;
+  --radius-xl:  1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: #faf9f7;
+  color: #27251f;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Premium scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar          { width: 5px; height: 5px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: #dbd8d2; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #bfbbb4; }
+
+/* ─── Sidebar dark scrollbar ─────────────────────────────────────────────── */
+.sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
+.sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* Phone preview scroll container — hides native scrollbar */
+.phone-preview-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.phone-preview-scroll::-webkit-scrollbar {
+  display: none;
+}

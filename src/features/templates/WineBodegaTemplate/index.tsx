@@ -1,0 +1,188 @@
+import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { Search, Cuboid, X, Wine } from 'lucide-react'
+import { cn } from '@shared/utils/cn'
+import { getThemeColors } from '@shared/utils/colorScale'
+import { AnnouncementBar, SocialsBar, InfoFooter, OrderButton, ReservationSection, PromoSection, FeaturedSection } from '../sections'
+import type { MenuTemplateProps } from '../types'
+import type { Dish } from '@core/domain/entities/Dish'
+import type { TenantBranding } from '@core/domain/entities/Tenant'
+
+// Wine Bodega — deep burgundy cava, refined Cardo serif, sommelier list with leaders.
+const DISPLAY = '"Cardo", serif'
+const BODY = '"Mulish", sans-serif'
+
+const INKBG = '#200d0d'
+const CARD = 'rgba(255,255,255,0.04)'
+const TEXT = '#f0e3df'
+const MUTED = 'rgba(240,227,223,0.52)'
+const HAIR = 'rgba(240,227,223,0.12)'
+
+function loadFonts(): void {
+  const id = 'wb2-fonts'
+  if (typeof document === 'undefined' || document.getElementById(id)) return
+  const link = document.createElement('link')
+  link.id = id
+  link.rel = 'stylesheet'
+  link.href = 'https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&family=Mulish:wght@400;500;600;700&display=swap'
+  document.head.appendChild(link)
+}
+
+const fmt = (n: number, c: string): string =>
+  new Intl.NumberFormat('es-CR', { style: 'currency', currency: c, minimumFractionDigits: 0 }).format(n)
+
+export default function WineBodegaTemplate({ tenant, menu, table, groups, tenantId }: MenuTemplateProps): ReactNode {
+  useEffect(loadFonts, [])
+  const tc = getThemeColors(tenant.branding)
+  const accent = tc.primary
+  const heroH = { compact: 220, normal: 286, tall: 352 }[tenant.branding.heroHeight] ?? 286
+  const allDishes = groups.flatMap((g) => g.dishes)
+  const tableLabel = table.label ?? `Mesa ${table.number}`
+
+  const [active, setActive] = useState<string | null>(groups[0]?.category.id ?? null)
+  const [query, setQuery] = useState('')
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
+
+  useEffect(() => {
+    if (!groups.length || typeof IntersectionObserver === 'undefined') return
+    const obs: IntersectionObserver[] = []
+    groups.forEach((g) => {
+      const el = sectionRefs.current[g.category.id]
+      if (!el) return
+      const o = new IntersectionObserver(([e]) => { if (e?.isIntersecting) setActive(g.category.id) }, { rootMargin: '-25% 0px -60% 0px' })
+      o.observe(el)
+      obs.push(o)
+    })
+    return () => obs.forEach((o) => o.disconnect())
+  }, [groups])
+
+  const scrollTo = (id: string): void => sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const filtered = query.trim()
+    ? allDishes.filter((d) => d.name.toLowerCase().includes(query.toLowerCase()) || (d.description ?? '').toLowerCase().includes(query.toLowerCase()))
+    : null
+
+  return (
+    <div style={{ background: INKBG, minHeight: '100svh', color: TEXT, fontFamily: BODY, fontSize: tc.textScale }}>
+      <AnnouncementBar branding={tenant.branding} tc={tc} />
+      <OrderButton branding={tenant.branding} tc={tc} />
+
+      <header className="relative shrink-0 overflow-hidden" style={{ height: heroH, backgroundColor: '#160808' }}>
+        {tenant.branding.coverImageUrl ? (
+          <img src={tenant.branding.coverImageUrl} alt={tenant.name} className="absolute inset-0 h-full w-full object-cover" style={{ opacity: tenant.branding.coverOpacity }} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 30%, ${accent}33 0%, transparent 60%), linear-gradient(180deg, #2c1010 0%, #150707 100%)` }} />
+        )}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.5) 100%)' }} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
+          <Wine size={26} style={{ color: accent, marginBottom: 12 }} />
+          <span style={{ fontFamily: BODY, fontWeight: 600, fontSize: '0.58rem', letterSpacing: '0.42em', textTransform: 'uppercase', color: accent, marginBottom: 12, paddingLeft: '0.42em' }}>Carta de Vinos · Cava</span>
+          <h1 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(2rem,7.5vw,3rem)', color: TEXT, margin: 0, lineHeight: 1.04, letterSpacing: '0.01em' }}>{tenant.name}</h1>
+          {tenant.branding.tagline ? <p style={{ fontFamily: DISPLAY, fontStyle: 'italic', fontSize: '1.05rem', color: MUTED, marginTop: 6 }}>{tenant.branding.tagline}</p> : null}
+          <span style={{ marginTop: 14, fontFamily: BODY, fontWeight: 500, fontSize: '0.64rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: MUTED, padding: '4px 14px', borderRadius: 999, border: `1px solid ${accent}66` }}>{tableLabel}</span>
+        </div>
+      </header>
+
+      <nav className="sticky top-0 z-30" style={{ background: 'rgba(32,13,13,0.9)', backdropFilter: 'blur(12px)', borderBottom: `1px solid ${HAIR}` }}>
+        <div className="flex overflow-x-auto scrollbar-hide" style={{ padding: '0 14px' }}>
+          {groups.map((g) => {
+            const isActive = active === g.category.id
+            return (
+              <button key={g.category.id} onClick={() => scrollTo(g.category.id)} className="shrink-0 transition-all duration-150" style={{ padding: '15px 13px 13px', background: 'none', border: 'none', fontFamily: DISPLAY, fontWeight: isActive ? 700 : 400, fontSize: '0.92rem', letterSpacing: '0.06em', color: isActive ? accent : MUTED, cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: `1.5px solid ${isActive ? accent : 'transparent'}` }}>
+                {g.category.name}
+              </button>
+            )
+          })}
+        </div>
+      </nav>
+
+      {tenant.branding.showSearch ? (
+        <div style={{ padding: '18px 16px 2px' }}>
+          <div className="flex items-center gap-2.5" style={{ background: CARD, border: `1px solid ${HAIR}`, borderRadius: 6, padding: '12px 16px' }}>
+            <Search size={15} style={{ color: accent, flexShrink: 0 }} />
+            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar…" className="flex-1 bg-transparent focus:outline-none placeholder:opacity-45" style={{ color: TEXT, fontSize: '0.9rem', fontFamily: BODY }} />
+            {query ? <button onClick={() => setQuery('')}><X size={14} style={{ color: MUTED }} /></button> : null}
+          </div>
+        </div>
+      ) : null}
+
+      <FeaturedSection branding={tenant.branding} tc={tc} dishes={allDishes} tenantId={tenantId} menuId={menu.id} />
+      <ReservationSection branding={tenant.branding} tc={tc} />
+      <PromoSection branding={tenant.branding} tc={tc} />
+
+      <main style={{ maxWidth: 660, margin: '0 auto', padding: '12px 18px 96px' }}>
+        {filtered ? (
+          <>
+            <p style={{ fontFamily: BODY, fontWeight: 500, fontSize: '0.82rem', color: MUTED, padding: '12px 2px 16px', textAlign: 'center' }}>{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</p>
+            <MenuCard dishes={filtered} tenantId={tenantId} menuId={menu.id} accent={accent} branding={tenant.branding} />
+          </>
+        ) : groups.map((group) => (
+          <section key={group.category.id} ref={(el) => { sectionRefs.current[group.category.id] = el }} style={{ paddingTop: 34, scrollMarginTop: 58 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, padding: '0 2px' }}>
+              <h2 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: '1.5rem', color: TEXT, margin: 0, lineHeight: 1.05, letterSpacing: '0.02em' }}>{group.category.name}</h2>
+              <span style={{ color: `${accent}aa`, fontSize: '0.9rem' }}>❧</span>
+              <span style={{ flex: 1, height: 1, background: HAIR }} />
+              <span style={{ fontFamily: BODY, fontWeight: 700, fontSize: '0.7rem', color: MUTED }}>{group.dishes.length}</span>
+            </div>
+            {group.category.description ? <p style={{ fontFamily: DISPLAY, fontStyle: 'italic', fontSize: '0.96rem', color: MUTED, margin: '0 0 14px', padding: '0 2px' }}>{group.category.description}</p> : null}
+            <MenuCard dishes={group.dishes} tenantId={tenantId} menuId={menu.id} accent={accent} branding={tenant.branding} />
+          </section>
+        ))}
+      </main>
+
+      <div style={{ borderTop: `1px solid ${HAIR}` }}>
+        <SocialsBar branding={tenant.branding} tc={tc} />
+        <InfoFooter branding={tenant.branding} tc={tc} />
+        <p style={{ textAlign: 'center', fontFamily: DISPLAY, fontStyle: 'italic', fontSize: '1.15rem', color: accent, padding: '18px 0 30px' }}>{tenant.name}</p>
+      </div>
+    </div>
+  )
+}
+
+function MenuCard({ dishes, tenantId, menuId, accent, branding }: { dishes: Dish[]; tenantId: string; menuId: string; accent: string; branding: TenantBranding }): ReactNode {
+  return (
+    <div style={{ background: CARD, borderRadius: 8, border: `1px solid ${HAIR}`, overflow: 'hidden' }}>
+      {dishes.map((dish, i) => (
+        <DishRow key={dish.id} dish={dish} tenantId={tenantId} menuId={menuId} accent={accent} branding={branding} divider={i < dishes.length - 1} />
+      ))}
+    </div>
+  )
+}
+
+function DishRow({ dish, tenantId, menuId, accent, branding, divider }: { dish: Dish; tenantId: string; menuId: string; accent: string; branding: TenantBranding; divider: boolean }): ReactNode {
+  const unavail = dish.status === 'unavailable'
+  const hasImg = Boolean(dish.assets.imageUrl)
+  const showBadges = branding.showDietaryBadges && (dish.nutrition.isVegan || dish.nutrition.isVegetarian || dish.nutrition.isGlutenFree)
+  return (
+    <Link to={`/${tenantId}/menu/${menuId}/dish/${dish.id}`} className={cn('group flex items-stretch gap-4 transition-colors duration-150 active:bg-white/[0.03]', unavail && 'opacity-45')} style={{ textDecoration: 'none', padding: '15px 16px', borderBottom: divider ? `1px solid ${HAIR}` : 'none' }}>
+      {hasImg ? (
+        <div className="relative shrink-0 overflow-hidden" style={{ width: 60, height: 60, borderRadius: 6 }}>
+          <img src={dish.assets.imageUrl ?? ''} alt={dish.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+          {dish.assets.hasAR ? <span className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white" style={{ background: `${accent}e6` }}><Cuboid size={7} />AR</span> : null}
+        </div>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-3">
+          <h3 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: '1.08rem', color: TEXT, margin: 0, lineHeight: 1.18, flexShrink: 1 }}>{dish.name}</h3>
+          <span aria-hidden="true" style={{ flex: 1, minWidth: 12, borderBottom: `1px dotted ${HAIR}`, transform: 'translateY(-4px)' }}></span>
+          {branding.showPrices ? <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: '1.04rem', color: accent, whiteSpace: 'nowrap' }}>{fmt(dish.price.amount, dish.price.currency)}</span> : null}
+        </div>
+        {dish.description ? (
+          <p style={{ fontFamily: BODY, fontWeight: 400, fontSize: '0.78rem', color: MUTED, margin: '4px 0 0', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>{dish.description}</p>
+        ) : null}
+        {showBadges || (!hasImg && dish.assets.hasAR) || unavail ? (
+          <div className="flex flex-wrap items-center gap-1.5" style={{ marginTop: 8 }}>
+            {!hasImg && dish.assets.hasAR ? <Badge accent={accent}><Cuboid size={9} />AR 3D</Badge> : null}
+            {branding.showDietaryBadges && dish.nutrition.isVegan ? <Badge accent={accent}>🌱 Vegano</Badge> : null}
+            {branding.showDietaryBadges && !dish.nutrition.isVegan && dish.nutrition.isVegetarian ? <Badge accent={accent}>🥦 Veggie</Badge> : null}
+            {branding.showDietaryBadges && dish.nutrition.isGlutenFree ? <Badge accent={accent}>🌾 Sin gluten</Badge> : null}
+            {unavail ? <span style={{ fontFamily: BODY, fontWeight: 600, fontSize: '0.62rem', color: '#fca5a5', background: 'rgba(248,113,113,0.12)', padding: '2px 8px', borderRadius: 999 }}>Agotado</span> : null}
+          </div>
+        ) : null}
+      </div>
+    </Link>
+  )
+}
+
+function Badge({ children, accent }: { children: ReactNode; accent: string }): ReactNode {
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontFamily: BODY, fontWeight: 600, fontSize: '0.62rem', color: accent, background: `${accent}1f`, border: `1px solid ${accent}33`, padding: '1px 8px', borderRadius: 999 }}>{children}</span>
+}

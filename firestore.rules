@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verified via Firestore members subcollection — never trusts JWT claims alone.
+    // Cost: 1 extra read per write operation (acceptable for admin-only paths).
+    function isTenantMember(tenantId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid));
+    }
+
+    function isTenantOwner(tenantId) {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid)).data.role == 'owner';
+    }
+
+    // ── Tenants ───────────────────────────────────────────────────────────────
+    match /tenants/{tenantId} {
+      // Public read: required for QR customer views (branding, feature flags, template refs)
+      allow read: if true;
+      // Self-serve bootstrap: un usuario autenticado puede CREAR un tenant nuevo
+      // solo si se pone a sí mismo como ownerId. `create` no dispara si el doc ya
+      // existe, así que no puede sobreescribir un tenant ajeno.
+      allow create: if isAuthenticated()
+                    && request.resource.data.ownerId == request.auth.uid;
+      // Solo el owner puede cambiar settings / branding o borrar.
+      allow update, delete: if isTenantOwner(tenantId);
+
+      // ── Members (internal — never expose full list to customers) ─────────────
+      match /members/{userId} {
+        allow read:  if isTenantMember(tenantId);
+        // Bootstrap: el usuario puede crear SU propia membresía owner, pero solo
+        // en un tenant cuyo ownerId ya es él (no puede unirse a tenants ajenos).
+        allow create: if isAuthenticated()
+                      && userId == request.auth.uid
+                      && request.resource.data.role == 'owner'
+                      && get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid;
+        // Gestión posterior de miembros: solo el owner.
+        allow update, delete: if isTenantOwner(tenantId);
+      }
+
+      // ── Menus ─────────────────────────────────────────────────────────────────
+      match /menus/{menuId} {
+        allow read:  if true;
+        allow write: if isTenantMember(tenantId);
+
+        // ── Dishes (nested under menu — firestorePaths pattern) ───────────────
+        match /dishes/{dishId} {
+          allow read:  if true;
+          allow write: if isTenantMember(tenantId);
+        }
+
+        // ── Categories (nested under menu — firestorePaths pattern) ──────────
+        match /categories/{categoryId} {
+          allow read:  if true;
+          allow write: if isTenantMember(tenantId);
+        }
+      }
+
+      // ── Dishes top-level (PATHS.tenantDish — flat pattern) ───────────────────
+      // Covers the PATHS constant in shared/constants/firestore-paths.ts which
+      // writes dishes directly under the tenant document, not nested under menus.
+      match /dishes/{dishId} {
+        allow read:  if true;
+        allow write: if isTenantMember(tenantId);
+      }
+
+      // ── Categories top-level (PATHS.tenantCategories — flat pattern) ─────────
+      match /categories/{categoryId} {
+        allow read:  if true;
+        allow write: if isTenantMember(tenantId);
+      }
+
+      // ── Tables ────────────────────────────────────────────────────────────────
+      match /tables/{tableId} {
+        allow read:  if true;
+        allow write: if isTenantMember(tenantId);
+      }
+
+      // ── Settings (singleton config document) ─────────────────────────────────
+      // Path: tenants/{tenantId}/settings/config (firestorePaths.settings)
+      match /settings/{docId} {
+        allow read:  if isTenantMember(tenantId);
+        allow write: if isTenantOwner(tenantId);
+      }
+
+      // ── Editor namespace — drafts + published document (Núcleo v2) ───────────
+      // Covers:
+      //   PATHS.editor.published  → tenants/{id}/editor/published  (singleton)
+      //   PATHS.editor.draft      → tenants/{id}/editor/drafts/{snapshotId}
+      // The {allPaths=**} wildcard captures both the singleton and the drafts
+      // subcollection at any depth without exposing them publicly.
+      match /editor/{allPaths=**} {
+        allow read:  if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId);
+        // delete (prune old drafts) — members only, not owner-restricted,
+        // because useEditorAutosave pruning runs in the client session.
+        allow delete: if isTenantMember(tenantId);
+      }
+
+      // ── Analytics events (raw, written by QR customers anonymously) ──────────
+      match /analyticsEvents/{eventId} {
+        allow read:          if isTenantMember(tenantId);
+        allow create:        if true;        // anonymous QR scan events
+        allow update, delete: if false;      // immutable — Cloud Functions aggregate
+      }
+
+      // ── Analytics daily summaries (Cloud Functions only via Admin SDK) ────────
+      match /analyticsDailySummaries/{date} {
+        allow read:  if isTenantMember(tenantId);
+        allow write: if false; // Admin SDK bypasses rules
+      }
+    }
+
+    // ── User accounts (top-level uid → tenantId mapping) ───────────────────────
+    // Escrito por el provisioning self-serve del cliente: cada usuario solo puede
+    // crear/editar SU propio doc. Es solo una pista de resolución de tenant —
+    // todas las escrituras reales siguen protegidas por la membresía del tenant.
+    match /users/{userId} {
+      allow read:          if isAuthenticated() && request.auth.uid == userId;
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete:        if false;
+    }
+
+    // ── Quotes (leads del flujo "Cotizar con nosotros") ────────────────────────
+    // Cualquier visitante puede enviar un lead. Nadie puede leerlos/editarlos
+    // desde el cliente — se revisan vía consola/Admin SDK (panel interno futuro).
+    match /quotes/{quoteId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
+    // ── Deny everything else explicitly ───────────────────────────────────────
+    // Any path not matched above is denied by default in Firestore, but this
+    // makes the intent visible in code review.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

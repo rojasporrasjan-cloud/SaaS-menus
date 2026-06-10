@@ -1,0 +1,1 @@
+export { TenantThemeBoundary } from './TenantThemeBoundary'

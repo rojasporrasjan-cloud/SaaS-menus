@@ -1,0 +1,103 @@
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { db } from '@infrastructure/firebase/firestore'
+import { firestorePaths } from '@infrastructure/firebase/paths'
+import type { ProfileFormValues, BrandingFormValues } from '../types/settings.types'
+import type { TenantAnnouncement, TenantSocials, TenantInfoFooter, TenantOrderButton, TenantBgGradient, TenantReservation, TenantPromo, TenantFeatured, ImageRounding } from '@core/domain/entities/Tenant'
+
+export const SettingsService = {
+  async updateProfile(tenantId: string, values: ProfileFormValues): Promise<void> {
+    await updateDoc(doc(db, firestorePaths.tenant(tenantId)), {
+      name: values.name,
+      timezone: values.timezone,
+      locale: values.locale,
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  async updateTemplate(tenantId: string, templateId: string): Promise<void> {
+    await updateDoc(doc(db, firestorePaths.tenant(tenantId)), {
+      templateId,
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  async updateAppearance(
+    tenantId: string,
+    templateId: string,
+    branding: {
+      name: string
+      primaryColor: string
+      backgroundColor: string
+      fontFamily: string
+      logoUrl: string | null
+      coverImageUrl: string | null
+      tagline: string | null
+      cardStyle: 'sharp' | 'rounded' | 'pill'
+      coverOpacity: number
+      textScale: 'sm' | 'md' | 'lg'
+      shadowDepth: 'flat' | 'soft' | 'deep'
+      heroHeight: 'compact' | 'normal' | 'tall'
+      showPrices: boolean
+      showDietaryBadges: boolean
+      imageRounding: ImageRounding
+      showSearch: boolean
+      bgGradient: TenantBgGradient
+      announcement: TenantAnnouncement
+      socials: TenantSocials
+      infoFooter: TenantInfoFooter
+      orderButton: TenantOrderButton
+      reservation: TenantReservation
+      promo: TenantPromo
+      featuredSection: TenantFeatured
+    },
+  ): Promise<void> {
+    await updateDoc(doc(db, firestorePaths.tenant(tenantId)), {
+      name: branding.name,
+      templateId,
+      'branding.primaryColor': branding.primaryColor,
+      'branding.backgroundColor': branding.backgroundColor,
+      'branding.fontFamily': branding.fontFamily,
+      'branding.logoUrl': branding.logoUrl,
+      'branding.coverImageUrl': branding.coverImageUrl,
+      'branding.tagline': branding.tagline ?? null,
+      'branding.cardStyle': branding.cardStyle,
+      'branding.coverOpacity': branding.coverOpacity,
+      'branding.textScale': branding.textScale,
+      'branding.shadowDepth': branding.shadowDepth,
+      'branding.heroHeight': branding.heroHeight,
+      'branding.showPrices': branding.showPrices,
+      'branding.showDietaryBadges': branding.showDietaryBadges,
+      'branding.imageRounding': branding.imageRounding,
+      'branding.showSearch': branding.showSearch,
+      'branding.bgGradient': branding.bgGradient,
+      'branding.announcement': branding.announcement,
+      'branding.socials': branding.socials,
+      'branding.infoFooter': branding.infoFooter,
+      'branding.orderButton': branding.orderButton,
+      'branding.reservation': branding.reservation,
+      'branding.promo': branding.promo,
+      'branding.featuredSection': branding.featuredSection,
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  async updateEmployeePin(tenantId: string, pinHash: string): Promise<void> {
+    await updateDoc(doc(db, firestorePaths.tenant(tenantId)), {
+      employeePinHash: pinHash,
+      updatedAt: serverTimestamp(),
+    })
+  },
+
+  async updateBranding(
+    tenantId: string,
+    _values: BrandingFormValues,
+    logoUrl: string | null,
+    coverImageUrl: string | null,
+  ): Promise<void> {
+    await updateDoc(doc(db, firestorePaths.tenant(tenantId)), {
+      'branding.logoUrl': logoUrl,
+      'branding.coverImageUrl': coverImageUrl,
+      updatedAt: serverTimestamp(),
+    })
+  },
+}

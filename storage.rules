@@ -1,0 +1,124 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifies that the request is operating inside the caller's own tenant folder.
+    // Storage does not have access to Firestore, so we rely on path ownership
+    // (the tenantId in the path must match the tenantId custom claim on the token).
+    // Claim is set by the backend at login via Admin SDK setCustomUserClaims().
+    function ownsTenantPath(tenantId) {
+      return isAuthenticated()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // ── Tenant-scoped storage ─────────────────────────────────────────────────
+    match /tenants/{tenantId} {
+
+      // ── Canva template exports (PNG, 20 MB max) ─────────────────────────────
+      // Public read: DataLayerRenderer and pdf export (html2canvas useCORS:true)
+      // need to load this URL from the browser without authentication.
+      match /templates/{fileName} {
+        allow read:  if true;
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 20 * 1024 * 1024
+          && request.resource.contentType == 'image/png';
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      // ── Branding assets (logo, cover image) ──────────────────────────────────
+      // Public read: needed for the public-facing QR menu and DataLayerRenderer.
+      // Write/delete: only the owning tenant.
+      match /branding/{fileName} {
+        allow read:  if true;
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 5 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      // ── Dish images ────────────────────────────────────────────────────────────
+      // Path: tenants/{tenantId}/dishes/{dishId}/image  (PATHS.storage.dishImage)
+      // Also covers: tenants/{tenantId}/images/{filename}  (StorageService)
+      match /dishes/{dishId}/{fileName} {
+        allow read:  if true;
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      match /images/{fileName} {
+        allow read:  if true;
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      // ── Thumbnails ─────────────────────────────────────────────────────────────
+      match /thumbnails/{fileName} {
+        allow read:  if true;
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 2 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      // ── AR 3D models (GLTF/USDZ only) ──────────────────────────────────────────
+      // Path: tenants/{tenantId}/ar-models/{dishId}  (PATHS.storage.arModel)
+      // Also covers: tenants/{tenantId}/models/{filename}  (StorageService)
+      match /ar-models/{fileName} {
+        allow read:  if true;
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 50 * 1024 * 1024
+          && (
+            request.resource.contentType == 'model/gltf-binary'
+            || request.resource.contentType == 'model/vnd.usdz+zip'
+          );
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      match /models/{fileName} {
+        allow read:  if true;
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 50 * 1024 * 1024
+          && (
+            request.resource.contentType == 'model/gltf-binary'
+            || request.resource.contentType == 'model/vnd.usdz+zip'
+          );
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      // ── AI upload buffer (Gemini Vision ingestion) ─────────────────────────────
+      // Temporary staging for images sent to the analyzeMenuImage Cloud Function.
+      // Strict: only images, 10 MB cap, no cross-tenant reads.
+      // Note: current implementation sends images as base64 in the function call body
+      // (no Storage write from the client). This rule is preemptive for future SDKs
+      // that may switch to resumable uploads.
+      match /ai_uploads/{fileName} {
+        allow read:  if ownsTenantPath(tenantId);  // private — AI results only
+        allow write: if ownsTenantPath(tenantId)
+          && request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+        allow delete: if ownsTenantPath(tenantId);
+      }
+
+      // ── Catch-all: deny any unrecognised path under the tenant folder ──────────
+      // Any upload not matching the explicit paths above is rejected.
+      // This prevents future accidental exposure if new paths are added in code
+      // before rules are updated.
+      match /{unrecognisedPath=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── Deny all paths outside /tenants/** ────────────────────────────────────
+    match /{allOtherPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
